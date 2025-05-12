@@ -1,0 +1,30 @@
+/* === Hero Section (Page d'accueil avec fond d'image) === */
+.hero-section {
+    /* Utilise l'image cover.jpg stockée dans le dossier assets */
+    background: url('../assets/cover.jpg') no-repeat center center/cover;
+    height: 91.2vh; /* Hauteur de la section sur presque tout l'écran */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    color: white; /* Texte blanc pour contraster avec l'image */
+    text-shadow: 0 0 10px rgba(0,0,0,0.7); /* Légère ombre pour améliorer la lisibilité du texte */
+  }
+  
+  .hero-section::before {
+    /* Ajoute un filtre sombre en superposition pour mieux lire le texte */
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4); /* Opacité 40% noir */
+    z-index: 0; /* Place le filtre en dessous du contenu */
+  }
+  
+  .hero-section > * {
+    position: relative;
+    z-index: 1; /* S'assure que le contenu (titre, formulaire) est au-dessus du filtre */
+  }

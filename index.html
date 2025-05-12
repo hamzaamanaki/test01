@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EasyTrip</title>
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top">
+      <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="#">
+          <img src="assets/logov2.png" alt="Logo EasyTrip" style="height: 40px; margin-right: 10px;" />
+          EasyTrip
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNavbar">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item"><a class="nav-link" href="#" onclick="event.preventDefault(); openUserGuide();">Fonctionnalités</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="event.preventDefault(); openRgpd();">À propos</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="event.preventDefault(); openContact();">Contact</a></li>
+          </ul>
+          <ul class="navbar-nav ms-auto" id="auth-actions"></ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Hero + Formulaire -->
+    <section class="hero-section text-center">
+      <div>
+        <h1 class="display-3 fw-bold">EasyTrip</h1>
+        <p class="lead fw-bold">Trajet malin, Avenir serein</p>
+        <form class="row g-2 justify-content-center mt-4">
+          <div class="col-md-2">
+            <autocomplete-input placeholder="Départ" @selected="selectedDeparture"></autocomplete-input>
+          </div>
+          <div class="col-md-2">
+            <autocomplete-input placeholder="Destination" @selected="selectedArrival"></autocomplete-input>
+          </div>
+          <div class="col-md-2">
+            <input type="date" class="form-control" />
+          </div>
+          <div class="col-md-2">
+            <select class="form-select">
+              <option>1 passager</option>
+              <option>2 passagers</option>
+              <option>3 passagers</option>
+              <option>4 passagers</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-primary w-100" type="button" onclick="searchTrips()">Rechercher</button>
+          </div>
+          <div class="col-12 text-danger text-center mt-2" id="error-message" style="display: none;"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ✅ Message d'alerte Bootstrap (personnalisé) -->
+    <div id="alert-container" class="container mt-3" style="display: none;">
+      <div id="alert-box" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <span id="alert-message">Une erreur s’est produite.</span>
+        <button type="button" class="btn-close" aria-label="Close" onclick="hideAlert()"></button>
+      </div>
+    </div>
+
+    <!-- Résultats affichés -->
+    <div class="container">
+      <trip-list v-if="!currentView && trips.length > 0" :trips="trips"></trip-list>
+    </div>
+
+    <!-- Composants dynamiques Vue -->
+    <transition name="fade" mode="out-in">
+<component
+  v-if="currentView"
+  :is="currentView"
+  :id="currentView === 'register-form' ? 'register' 
+       : currentView === 'login-form' ? 'login' 
+       : currentView === 'user-guide' ? 'guide-utilisateur'
+       : currentView === 'dashboard' ? 'dashboard'
+       : currentView === 'rgpd-notice' ? 'rgpd'
+       : currentView === 'contact-form' ? 'contact'
+       : ''"
+/>
+    </transition>
+
+    <!-- Bandeau cookies -->
+    <cookie-consent></cookie-consent>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="js/app.js" type="module"></script>
+
+  <script>
+    function getCookie(name) {
+      const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return match ? decodeURIComponent(match.pop()) : null;
+    }
+
+    function searchTrips() {
+      const address = window.app?.departure?.trim() || '';
+      const errorDiv = document.getElementById('error-message');
+
+      if (!address) {
+        errorDiv.textContent = "Veuillez entrer une adresse de départ.";
+        errorDiv.style.display = "block";
+        return;
+      } else {
+        errorDiv.style.display = "none";
+      }
+
+      document.cookie = `lastAddress=${encodeURIComponent(address)}; path=/; max-age=${60 * 60 * 24 * 7}`;
+
+      if (window.app) {
+        window.app.searchTrips(address);
+      }
+    }
+
+    function showAlert(message, type = 'danger') {
+      const container = document.getElementById('alert-container');
+      const box = document.getElementById('alert-box');
+      const msg = document.getElementById('alert-message');
+
+      box.className = `alert alert-${type} alert-dismissible fade show`;
+      msg.textContent = message;
+      container.style.display = 'block';
+    }
+
+    function hideAlert() {
+      const container = document.getElementById('alert-container');
+      container.style.display = 'none';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedAddress = getCookie('lastAddress');
+      if (savedAddress) {
+        window.selectedAddress = savedAddress;
+        setTimeout(() => {
+          const input = document.querySelector('autocomplete-input input');
+          if (input) input.value = savedAddress;
+        }, 100);
+      }
+    });
+  </script>
+</body>
+</html>
+
+
