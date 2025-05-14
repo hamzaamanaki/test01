@@ -1,81 +1,82 @@
 export default {
-  name: 'autocomplete-input',
+  name: 'AutocompleteInput',
   props: ['placeholder'],
-  emits: ['selected'],
   data() {
     return {
-      inputValue: '',
-      suggestions: [],
-      selectedIndex: -1,
-      debounceTimer: null
+      query: '',
+      results: [],
+      activeIndex: -1
     };
   },
+  watch: {
+    query(newQuery) {
+      if (newQuery.length >= 2) {
+        fetch(`proxy_nominatim.php?q=${encodeURIComponent(newQuery)}&countrycodes=be`)
+          .then(res => res.json())
+          .then(data => {
+            console.log("📦 Résultat brut de Nominatim :", data);
+            this.results = (data || []).map(f => f.display_name || '');
+            console.log("✅ Résultats extraits :", this.results);
+            this.activeIndex = -1;
+          })
+          .catch(err => {
+            console.error("❌ Erreur proxy Nominatim :", err);
+            this.results = [];
+          });
+      } else {
+        this.results = [];
+      }
+    }
+  },
+  methods: {
+    select(address) {
+      this.query = address;
+      this.results = [];
+      this.$emit('selected', address);
+    },
+    navigate(direction) {
+      if (!this.results.length) return;
+      this.activeIndex += direction;
+
+      if (this.activeIndex < 0) this.activeIndex = this.results.length - 1;
+      if (this.activeIndex >= this.results.length) this.activeIndex = 0;
+    },
+    onEnter() {
+      if (this.activeIndex >= 0 && this.activeIndex < this.results.length) {
+        this.select(this.results[this.activeIndex]);
+      } else if (this.results.length === 1) {
+        this.select(this.results[0]);
+      }
+    }
+  },
   template: `
-    <div class="position-relative">
-      <input 
-        type="text" 
-        class="form-control" 
-        v-model="inputValue" 
-        @input="debouncedInput"
-        @keydown.down.prevent="onArrowDown"
-        @keydown.up.prevent="onArrowUp"
+    <div class="autocomplete position-relative">
+      <input
+        type="text"
+        class="form-control"
+        :placeholder="placeholder"
+        v-model="query"
+        @keydown.down.prevent="navigate(1)"
+        @keydown.up.prevent="navigate(-1)"
         @keydown.enter.prevent="onEnter"
-        :placeholder="placeholder || 'Adresse...'"
         autocomplete="off"
       />
-      <ul v-if="suggestions.length" class="list-group position-absolute z-3 w-100 shadow-sm">
-        <li 
-          class="list-group-item list-group-item-action" 
-          v-for="(item, index) in suggestions" 
+
+      <ul
+        v-if="results.length > 0"
+        class="list-group position-absolute w-100 shadow mt-1"
+        style="z-index: 9999; max-height: 200px; overflow-y: auto; background: white;"
+      >
+        <li
+          v-for="(r, index) in results"
           :key="index"
-          :class="{ active: index === selectedIndex }"
-          @click="selectSuggestion(item)"
+          class="list-group-item list-group-item-action"
+          :class="{ active: index === activeIndex }"
+          @click="select(r)"
         >
-          {{ item }}
+          {{ r }}
         </li>
       </ul>
     </div>
-  `,
-  methods: {
-    debouncedInput() {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = setTimeout(this.onInput, 300); // ⚡ debounce 300ms
-    },
-    onInput() {
-      if (this.inputValue.length < 3) {
-        this.suggestions = [];
-        return;
-      }
-
-      fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(this.inputValue)}&limit=5`)
-        .then(res => res.json())
-        .then(data => {
-          this.suggestions = data.features.map(f => {
-            const p = f.properties;
-            return `${p.name || ''}, ${p.postcode || ''} ${p.city || ''}, ${p.country || ''}`;
-          }).filter(Boolean);
-          this.selectedIndex = -1;
-        })
-        .catch(() => {
-          this.suggestions = [];
-        });
-    },
-    selectSuggestion(suggestion) {
-      this.inputValue = suggestion;
-      this.suggestions = [];
-      this.$emit('selected', suggestion);
-    },
-    onArrowDown() {
-      if (this.selectedIndex < this.suggestions.length - 1) this.selectedIndex++;
-    },
-    onArrowUp() {
-      if (this.selectedIndex > 0) this.selectedIndex--;
-    },
-    onEnter() {
-      if (this.selectedIndex >= 0) {
-        this.selectSuggestion(this.suggestions[this.selectedIndex]);
-      }
-    }
-  }
+  `
 };
-

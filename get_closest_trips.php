@@ -1,46 +1,55 @@
 <?php
-// get_closest_trips.php : retourne les 2 trajets les plus proches d'une position donnée
+header('Content-Type: application/json');
 
+// Connexion à la base de données
 $host = 'localhost';
 $dbname = 'ebus2_projet04_arrt10';
 $username = 'ai77sr47rrry';
 $password = 'a7!p2a.7ie';
 
-header('Content-Type: application/json');
-
-if (!isset($_GET['lat']) || !isset($_GET['lon'])) {
-  echo json_encode(['error' => 'Coordonnées GPS manquantes.']);
+// Vérifie les paramètres requis
+if (!isset($_GET['lat'], $_GET['lon'], $_GET['city'])) {
+  echo json_encode(['success' => false, 'error' => 'Coordonnées ou ville manquantes.']);
   exit;
 }
 
+// Récupération et nettoyage des paramètres
 $lat = floatval($_GET['lat']);
 $lon = floatval($_GET['lon']);
+$city = trim($_GET['city']);
+$maxDistance = 50; // distance max en km (modifiable si besoin)
 
 try {
   $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
   $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-  // Requête SQL avec calcul de distance (formule de Haversine)
-  $stmt = $pdo->prepare(
-    "SELECT *,
-      (6371 * acos(
-        cos(radians(:lat)) * cos(radians(departure_lat)) *
-        cos(radians(departure_lon) - radians(:lon)) +
-        sin(radians(:lat)) * sin(radians(departure_lat))
-      )) AS distance
-     FROM trips
-     WHERE departure_lat IS NOT NULL AND departure_lon IS NOT NULL
-     ORDER BY distance ASC
-     LIMIT 2"
-  );
+  $sql = "
+    SELECT *, (
+      6371 * ACOS(
+        COS(RADIANS(:lat)) * COS(RADIANS(departure_lat)) *
+        COS(RADIANS(departure_lon) - RADIANS(:lon)) +
+        SIN(RADIANS(:lat)) * SIN(RADIANS(departure_lat))
+      )
+    ) AS distance
+    FROM trips
+    WHERE departure_city = :city
+      AND seats_available > 0
+    HAVING distance <= :maxDistance
+    ORDER BY distance ASC
+    LIMIT 10
+  ";
 
-  $stmt->execute([':lat' => $lat, ':lon' => $lon]);
-  $trips = $stmt->fetchAll(PDO::FETCH_ASSOC);
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute([
+    ':lat' => $lat,
+    ':lon' => $lon,
+    ':city' => $city,
+    ':maxDistance' => $maxDistance
+  ]);
 
-  echo json_encode(['success' => true, 'trips' => $trips]);
+  $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+  echo json_encode(['success' => true, 'trips' => $results]);
 
-} catch (Exception $e) {
-  echo json_encode(['error' => 'Erreur serveur : ' . $e->getMessage()]);
-  exit;
+} catch (PDOException $e) {
+  echo json_encode(['success' => false, 'error' => 'Erreur serveur : ' . $e->getMessage()]);
 }
-?>

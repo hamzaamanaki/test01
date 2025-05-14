@@ -13,7 +13,7 @@ const { createApp } = Vue;
 const app = createApp({
   data() {
     return {
-      currentView: '', // Vue dynamique (vide = trip-list)
+      currentView: '',
       pendingScrollToId: null,
       trips: [],
       departure: '',
@@ -29,41 +29,76 @@ const app = createApp({
       this.departure = address;
     },
 
-    async searchTrips(address) {
-      try {
-        this.currentView = ''; // 🔁 Réinitialiser la vue active
+    formatShortDateTime(dateTime) {
+      if (!dateTime) return '';
+      const options = {
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit'
+      };
+      return new Date(dateTime).toLocaleString('fr-BE', options);
+    },
 
-        const geoUrl = `proxy_nominatim.php?q=${encodeURIComponent(address)}`;
+    async searchTrips() {
+      try {
+        this.currentView = '';
+
+        const address = this.departure;
+        if (!address) {
+          alert("Veuillez entrer une adresse de départ.");
+          return;
+        }
+
+        const geoUrl = `proxy_nominatim.php?q=${encodeURIComponent(address)}&countrycodes=be`;
         const geoRes = await fetch(geoUrl, {
           headers: {
             'User-Agent': 'EasyTripApp/1.0 (hamza.amanaki@student.hepl.be)'
           }
         });
-        const geoData = await geoRes.json();
 
-        if (!geoData.length) {
+        const geoData = await geoRes.json();
+        console.log("📦 Données retournées par Photon :", geoData);
+
+        const features = geoData.features || [];
+        if (!features.length) {
           alert("Adresse introuvable.");
           return;
         }
 
-        const { lat, lon } = geoData[0];
-        const tripsRes = await fetch(`get_closest_trips.php?lat=${lat}&lon=${lon}`);
+        const { lat, lon } = features[0].geometry.coordinates
+          ? { lat: features[0].geometry.coordinates[1], lon: features[0].geometry.coordinates[0] }
+          : {};
+
+        const city = (address.split(',')[0] || '').trim();
+        console.log("🏙️ Ville extraite depuis l'adresse saisie :", city);
+
+        if (!city || !lat || !lon) {
+          alert("Impossible de déterminer la ville ou les coordonnées GPS.");
+          return;
+        }
+
+        const tripsRes = await fetch(`get_closest_trips.php?lat=${lat}&lon=${lon}&city=${encodeURIComponent(city)}`);
         const result = await tripsRes.json();
 
         if (result.success) {
-          this.trips = result.trips;
+          if (result.trips.length === 0) {
+            alert(`🚫 Aucun trajet trouvé au départ de ${city}.`);
+            this.trips = [];
+            return;
+          }
 
+          this.trips = result.trips;
           this.$nextTick(() => {
             const el = document.getElementById('trip-results');
             if (el) el.scrollIntoView({ behavior: 'smooth' });
           });
-
         } else {
           this.trips = [];
           alert(result.error || 'Aucun trajet trouvé.');
         }
       } catch (err) {
-        console.error(err);
+        console.error("💥 Erreur dans searchTrips :", err);
         alert("Erreur réseau lors de la recherche.");
       }
     },
@@ -87,9 +122,11 @@ const app = createApp({
         }, 50);
       });
     },
+
     openContact() {
-  this.scrollToComponent('contact-form', 'contact');
-},
+      this.scrollToComponent('contact-form', 'contact');
+    },
+
     openRgpd() {
       this.scrollToComponent('rgpd-notice', 'rgpd');
     },
@@ -115,7 +152,6 @@ const app = createApp({
     updateAuthMenu() {
       const authContainer = document.getElementById('auth-actions');
       const user = JSON.parse(localStorage.getItem('user'));
-
       if (!authContainer) return;
 
       if (user) {
@@ -181,5 +217,7 @@ window.openRgpd = () => myApp.openRgpd();
 window.openLogin = () => myApp.openLogin();
 window.openDashboard = () => myApp.openDashboard();
 window.openContact = () => myApp.openContact();
-window.searchTrips = (address) => myApp.searchTrips(address);
+window.searchTrips = () => myApp.searchTrips();
 window.app = myApp;
+
+

@@ -9,7 +9,6 @@ export default {
   methods: {
     reserveTrip(tripId) {
       const user = JSON.parse(localStorage.getItem('user'));
-
       if (!user) {
         this.displayAlert("Veuillez vous connecter pour réserver.", 'warning');
         return;
@@ -37,14 +36,27 @@ export default {
         this.displayAlert("Erreur réseau.", 'danger');
       });
     },
+
     displayAlert(message, type = 'danger') {
       if (typeof window.showAlert === 'function') {
         window.showAlert(message, type);
       } else {
         alert(message);
       }
+    },
+
+    formatShortDateTime(dateTime) {
+      if (!dateTime) return '';
+      const options = {
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit'
+      };
+      return new Date(dateTime).toLocaleString('fr-BE', options);
     }
   },
+
   template: `
     <div v-if="trips && trips.length" class="container mt-5" id="trip-results">
       <h4 class="mb-4 text-primary">
@@ -66,7 +78,9 @@ export default {
           <div class="row mb-2">
             <div class="col-md-6">
               <i class="bi bi-clock-fill text-primary me-2"></i>
-              <strong>Heure :</strong> {{ trip.departure_time }} → {{ trip.arrival_time }}
+              <strong>Heure :</strong>
+              {{ formatShortDateTime(trip.departure_time) }} →
+              {{ formatShortDateTime(trip.arrival_time) }}
             </div>
             <div class="col-md-6">
               <i class="bi bi-signpost-2-fill text-primary me-2"></i>
@@ -93,4 +107,6 @@ export default {
     </div>
   `
 };
+
+
 
